@@ -12,39 +12,32 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            // Check if the review state is "approved"
             if (context.payload.review.state !== "approved") {
               core.info("The review is not an approval. Exiting...");
               return;
             }
 
-            // Team to check for membership
-            const team_slug = "maintainer";
-            const org = context.repo.owner;
+            const team_slug = "maintainer"; // ここに実際のチームスラグを設定
+            const org = context.repo.owner; // ここに実際の組織名を設定
 
-            // Fetch team members
             async function isTeamMember(team_slug, username, org) {
               try {
-                // Check if the user is a member of the specified team
                 const response = await github.rest.teams.getMembershipForUserInOrg({
                   org: org,
                   team_slug: team_slug,
                   username: username,
                 });
-                core.info(response);
                 return response.data.state === "active";
               } catch (error) {
-                core.info("Failed to fetch team membership: " + error.message);
+                core.error(`Failed to fetch team membership for ${username} in ${team_slug} of ${org}: ` + error.message);
                 return false;
               }
             }
 
-            // Check if the reviewer is a team member
             const reviewer = context.payload.review.user.login;
             isTeamMember(team_slug, reviewer, org).then(isMember => {
               if (isMember) {
                 core.info(`${reviewer} is a team member and approved. Auto-approving the PR.`);
-                // Approve the PR
                 github.rest.pulls.createReview({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
