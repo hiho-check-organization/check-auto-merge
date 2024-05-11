@@ -12,5 +12,5 @@ jobs:
         with:
           script: |
             const org = context.repo.owner;
-            const response = await octokit.rest.teams.listForAuthenticatedUser()
+            const response = await github.rest.teams.listForAuthenticatedUser()
             core.info(response);
