@@ -1,0 +1,17 @@
+name: Auto Approve by Maintainer Team
+
+on:
+  push:
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if the reviewer is a team member and approved
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const response = await github.rest.teams.list({
+              org,
+            });
+            core.info(response);
