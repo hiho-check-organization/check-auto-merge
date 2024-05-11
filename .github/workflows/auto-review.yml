@@ -36,5 +36,5 @@ jobs:
               console.log(`${reviewer} is a member of ${teamSlug} and approved this PR.`);
               // 例えば、他のワークフローをトリガーするなど
             }
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
