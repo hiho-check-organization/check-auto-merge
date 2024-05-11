@@ -1,34 +1,38 @@
 name: Auto Approve
 
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    if: github.event.review.state == 'approved'
     steps:
-      - name: Check membership
-        id: check_membership
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /orgs/{org}/teams/{team_slug}/memberships/{username}
-          org: 'hiho-check-organization'
-          team_slug: 'maintainer'
-          username: ${{ github.event.review.user.login }}
-          mediaType: '{"previews": ["hellcat"]}'
+      - name: Check for approval from team members
+        run: |
+          TEAM_SLUG="maintainer-team"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          REPO="${{ github.repository }}"
+
+          # チームメンバーのリストを取得
+          MEMBERS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/orgs/{org_name}/teams/$TEAM_SLUG/members" | jq -r '.[].login')
+
+          # プルリクエストのレビューコメントを取得
+          COMMENTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/comments" | jq -r '.[].user.login')
+
+          # チームメンバーが承認コメントを残しているか確認
+          for member in $MEMBERS; do
+            if [[ "$COMMENTS" =~ "$member" ]]; then
+              # 承認APIをコール
+              curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/reviews" \
+                -d '{"event":"APPROVE"}'
+              break
+            fi
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Auto-approve
-        if: steps.check_membership.outputs.status == 'active'
-        uses: octokit/request-action@v2.x
-        with:
-          route: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.event.repository.name }}
-          pull_number: ${{ github.event.pull_request.number }}
-          event: 'APPROVE'
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }} # Personal Access Token with repo scope
