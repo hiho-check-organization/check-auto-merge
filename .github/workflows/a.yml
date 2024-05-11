@@ -11,7 +11,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const org = context.repo.owner;
             const response = await github.rest.teams.list({
-              org,
+              org: ,
             });
             core.info(response);
