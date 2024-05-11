@@ -31,9 +31,10 @@ jobs:
                   team_slug: team_slug,
                   username: username,
                 });
+                core.info(response);
                 return response.data.state === "active";
               } catch (error) {
-                core.error("Failed to fetch team membership: " + error.message);
+                core.info("Failed to fetch team membership: " + error.message);
                 return false;
               }
             }
