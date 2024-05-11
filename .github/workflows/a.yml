@@ -13,6 +13,6 @@ jobs:
           script: |
             const org = context.repo.owner;
             const response = await github.rest.teams.list({
-              org: ,
+              org,
             });
             core.info(response);
