@@ -1,0 +1,40 @@
+name: Auto Approve from Maintainer Team
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if approved by a maintainer
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const teamSlug = 'maintainer'; // Teamのスラッグを設定
+            const githubToken = process.env.GITHUB_TOKEN;
+            const { owner, repo } = context.repo;
+            const pullNumber = context.payload.pull_request.number;
+            const reviewer = context.payload.review.user.login;
+            const reviewState = context.payload.review.state;
+
+            const octokit = github.getOctokit(githubToken);
+
+            // チームメンバーのリストを取得
+            const { data: teamMembers } = await octokit.rest.teams.listMembersInOrg({
+              org: owner,
+              team_slug: teamSlug,
+            });
+
+            // チームメンバーかどうかを確認
+            const isTeamMember = teamMembers.find(member => member.login === reviewer);
+
+            // 承認されたレビューかどうかを確認
+            if (isTeamMember && reviewState === 'approved') {
+              // 何らかのアクションを実行
+              console.log(`${reviewer} is a member of ${teamSlug} and approved this PR.`);
+              // 例えば、他のワークフローをトリガーするなど
+            }
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
