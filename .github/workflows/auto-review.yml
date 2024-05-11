@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Check for approval from team members
         run: |
-          TEAM_SLUG="maintainer-team"
+          TEAM_SLUG="maintainer"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           REPO="${{ github.repository }}"
