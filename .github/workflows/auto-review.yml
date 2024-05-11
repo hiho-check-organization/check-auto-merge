@@ -1,4 +1,4 @@
-name: Auto Approve from Maintainer Team
+name: Auto Approve
 
 on:
   pull_request_review:
@@ -7,34 +7,28 @@ on:
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
+    if: github.event.review.state == 'approved'
     steps:
-      - name: Check if approved by a maintainer
-        uses: actions/github-script@v5
+      - name: Check membership
+        id: check_membership
+        uses: octokit/request-action@v2.x
         with:
-          script: |
-            const teamSlug = 'maintainer'; // Teamのスラッグを設定
-            const githubToken = process.env.GITHUB_TOKEN;
-            const { owner, repo } = context.repo;
-            const pullNumber = context.payload.pull_request.number;
-            const reviewer = context.payload.review.user.login;
-            const reviewState = context.payload.review.state;
-
-            const octokit = github.getOctokit(githubToken);
-
-            // チームメンバーのリストを取得
-            const { data: teamMembers } = await octokit.rest.teams.listMembersInOrg({
-              org: owner,
-              team_slug: teamSlug,
-            });
-
-            // チームメンバーかどうかを確認
-            const isTeamMember = teamMembers.find(member => member.login === reviewer);
-
-            // 承認されたレビューかどうかを確認
-            if (isTeamMember && reviewState === 'approved') {
-              // 何らかのアクションを実行
-              console.log(`${reviewer} is a member of ${teamSlug} and approved this PR.`);
-              // 例えば、他のワークフローをトリガーするなど
-            }
+          route: GET /orgs/{org}/teams/{team_slug}/memberships/{username}
+          org: 'hiho-check-organization'
+          team_slug: 'maintainer'
+          username: ${{ github.event.review.user.login }}
+          mediaType: '{"previews": ["hellcat"]}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-approve
+        if: steps.check_membership.outputs.status == 'active'
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          pull_number: ${{ github.event.pull_request.number }}
+          event: 'APPROVE'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }} # Personal Access Token with repo scope
