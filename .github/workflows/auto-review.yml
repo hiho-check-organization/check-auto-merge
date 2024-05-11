@@ -1,4 +1,4 @@
-name: Auto Approve
+name: Auto Approve by Maintainer Team
 
 on:
   pull_request_review:
@@ -8,31 +8,53 @@ jobs:
   auto-approve:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for approval from team members
-        run: |
-          TEAM_SLUG="maintainer"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          REPO="${{ github.repository }}"
+      - name: Check if the reviewer is a team member and approved
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const github = require('@actions/github');
+            const core = require('@actions/core');
+            const context = github.context;
 
-          # チームメンバーのリストを取得
-          MEMBERS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/orgs/{org_name}/teams/$TEAM_SLUG/members" | jq -r '.[].login')
+            // Check if the review state is "approved"
+            if (context.payload.review.state !== "approved") {
+              core.info("The review is not an approval. Exiting...");
+              return;
+            }
 
-          # プルリクエストのレビューコメントを取得
-          COMMENTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/comments" | jq -r '.[].user.login')
+            // Team to check for membership
+            const team_slug = "maintainer";
+            const org = context.repo.owner;
 
-          # チームメンバーが承認コメントを残しているか確認
-          for member in $MEMBERS; do
-            if [[ "$COMMENTS" =~ "$member" ]]; then
-              # 承認APIをコール
-              curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/reviews" \
-                -d '{"event":"APPROVE"}'
-              break
-            fi
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            // Fetch team members
+            async function isTeamMember(team_slug, username, org) {
+              try {
+                // Check if the user is a member of the specified team
+                const response = await github.rest.teams.getMembershipForUserInOrg({
+                  org: org,
+                  team_slug: team_slug,
+                  username: username,
+                });
+                return response.data.state === "active";
+              } catch (error) {
+                core.error("Failed to fetch team membership: " + error.message);
+                return false;
+              }
+            }
+
+            // Check if the reviewer is a team member
+            const reviewer = context.payload.review.user.login;
+            isTeamMember(team_slug, reviewer, org).then(isMember => {
+              if (isMember) {
+                core.info(`${reviewer} is a team member and approved. Auto-approving the PR.`);
+                // Approve the PR
+                github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.payload.pull_request.number,
+                  event: "APPROVE",
+                });
+              } else {
+                core.info(`${reviewer} is not a team member or the review is not an approval.`);
+              }
+            });
